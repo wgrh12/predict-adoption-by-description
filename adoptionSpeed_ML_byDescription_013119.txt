@@ -1,0 +1,67 @@
+## A script for practicing ML on text data to predict pet adoption speed based on description.
+## Script name: adoptionSpeed_ML_byDescription.py
+## Date: 01/31/2019
+## Author: Wei Guo
+## Data source: Gaggle.com PetAdoptionSpeed competition
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer 
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+
+## Load data
+train = pd.read_csv("../input/train/train.csv").fillna(' ')
+test  = pd.read_csv("../input/test/test.csv").fillna(' ')
+desc_train=train.Description
+y = train['AdoptionSpeed']
+## External test data 
+text_extest_orig = test[['PetID','Description']]
+
+text_train, text_test,y_train,y_test = train_test_split(desc_train, y, stratify=y, random_state=42)
+print(text_train.shape)
+print(text_train.head(5))
+print(text_test.shape)
+print(text_test.head(5))
+print(y_train.shape)
+print(y_train.head(5))
+print(y_test.shape)
+print(y_test.head(5))
+
+vect = CountVectorizer(min_df=5, stop_words="english").fit(text_train)
+X_train = vect.transform(text_train)
+X_test  = vect.transform(text_test)
+print(repr(X_train))
+print(X_train.toarray())
+print(repr(X_test))
+#print(X_train.toarray())
+
+# 5-fold cross validation
+scores = cross_val_score(LogisticRegression(), X_train,y_train,cv=5)
+print("Training mean cross val score: {:.2f}".format(np.mean(scores)))
+
+#Grid search for best regularization parameter C and cross validation
+param_grid = {'C': [0.001, 0.01, 0.1, 1, 10]}
+grid = GridSearchCV(LogisticRegression(),param_grid,cv=5)
+grid.fit(X_train,y_train)
+print(grid.best_score_)
+print(grid.best_params_)
+
+# Internal validation
+print("CV score on X_test, y_test: {:.2f}".format(grid.score(X_test, y_test)))
+
+# External test
+text_extest = text_extest_orig.Description
+X_extest = vect.transform(text_extest)
+print(repr(X_extest))
+pred = grid.predict(X_extest)
+
+# Prepare submission
+submission_df = pd.DataFrame(text_extest_orig['PetID'], columns=['PetID'])
+submission_df['AdoptionSpeed'] = pred
+submission_df.to_csv("AdoptionSpeed_ML_byDescription_013110.csv", index=False)
+
+
